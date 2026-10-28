@@ -1,0 +1,146 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Crypto Practice Trader</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#0b1020;color:#f1f5f9;font-family:Arial,sans-serif;padding:18px}
+header{font-size:24px;font-weight:bold;margin:10px 0 20px}
+.card{background:#151d30;border:1px solid #29364d;border-radius:14px;padding:16px;margin:14px 0}
+.muted{color:#9baac1;font-size:13px}
+.price{font-size:25px;font-weight:bold;margin:8px 0}
+.green{color:#38d996}.red{color:#ff7185}
+label{display:block;margin:14px 0 7px}
+input,select{width:100%;padding:12px;border-radius:8px;background:#0b1020;color:white;border:1px solid #42516a;font-size:16px}
+button{padding:11px 8px;border-radius:8px;border:1px solid #42516a;background:#202d44;color:white;cursor:pointer}
+.choices{display:flex;gap:7px;margin:8px 0}
+.choices button{flex:1}
+button.active{border-color:#43d9a0;background:#164c40}
+.actions{display:flex;gap:10px;margin-top:18px}
+.actions button{flex:1;font-size:16px;font-weight:bold}
+.buy{background:#087f5b}.sell{background:#a92f48}
+table{width:100%;border-collapse:collapse;font-size:13px}
+td,th{text-align:left;padding:9px 3px;border-bottom:1px solid #29364d}
+canvas{width:100%;height:180px}
+</style>
+</head>
+<body>
+<header>₿ Crypto Practice Trader</header>
+<p class="muted">DEMO ONLY · No real money or real orders</p>
+
+<div class="card">
+<div class="muted">VIRTUAL ACCOUNT BALANCE</div>
+<div class="price" id="balance">$10,000.00</div>
+<div class="muted">Practice funds only</div>
+</div>
+
+<div class="card">
+<label for="coin">Cryptocurrency</label>
+<select id="coin">
+<option value="bitcoin">Bitcoin (BTC)</option>
+<option value="ethereum">Ethereum (ETH)</option>
+<option value="solana">Solana (SOL)</option>
+</select>
+<div class="muted">Current market price</div>
+<div class="price" id="price">Loading price...</div>
+<div id="change" class="muted">Fetching public market data</div>
+<canvas id="chart" width="600" height="220"></canvas>
+<button onclick="loadPrice()">Refresh price</button>
+</div>
+
+<div class="card">
+<h3>Practice trade</h3>
+<label for="amount">Trade amount (USD)</label>
+<input id="amount" type="number" min="1" value="100">
+
+<label>Risk (%)</label>
+<div class="choices" id="risks">
+<button class="active" onclick="choose('risk',7,this)">7%</button>
+<button onclick="choose('risk',15,this)">15%</button>
+<button onclick="choose('risk',20,this)">20%</button>
+<button onclick="choose('risk',25,this)">25%</button>
+</div>
+
+<label>Reward (%)</label>
+<div class="choices" id="rewards">
+<button class="active" onclick="choose('reward',7,this)">7%</button>
+<button onclick="choose('reward',15,this)">15%</button>
+<button onclick="choose('reward',20,this)">20%</button>
+<button onclick="choose('reward',25,this)">25%</button>
+</div>
+
+<div class="muted" id="estimate">Potential loss: $7.00 · Potential profit: $7.00</div>
+<div class="actions">
+<button class="buy" onclick="trade('BUY')">Practice Buy</button>
+<button class="sell" onclick="trade('SELL')">Practice Sell</button>
+</div>
+<p class="muted">These are simulated outcomes, not guaranteed profits. Risk and reward are percentages of your trade amount.</p>
+</div>
+
+<div class="card">
+<h3>Trade history</h3>
+<div style="overflow-x:auto">
+<table>
+<thead><tr><th>Time</th><th>Side</th><th>Asset</th><th>Amount</th></tr></thead>
+<tbody id="history"><tr><td colspan="4">No practice trades yet</td></tr></tbody>
+</table>
+</div>
+</div>
+
+<script>
+let balance=10000,risk=7,reward=7,prices=[],currentPrice=0;
+const fmt=n=>n.toLocaleString('en-US',{style:'currency',currency:'USD'});
+function updateBalance(){document.getElementById('balance').textContent=fmt(balance)}
+function choose(type,value,button){
+if(type==='risk')risk=value;else reward=value;
+document.querySelectorAll('#'+(type==='risk'?'risks':'rewards')+' button').forEach(b=>b.classList.remove('active'));
+button.classList.add('active');estimate();
+}
+function estimate(){
+let n=Math.max(0,Number(document.getElementById('amount').value)||0);
+document.getElementById('estimate').textContent='Potential loss: '+fmt(n*risk/100)+' · Potential profit: '+fmt(n*reward/100);
+}
+document.getElementById('amount').addEventListener('input',estimate);
+function draw(){
+let c=document.getElementById('chart'),ctx=c.getContext('2d');
+ctx.clearRect(0,0,c.width,c.height);
+if(prices.length<2){ctx.fillStyle='#9baac1';ctx.fillText('Price chart appears after data loads',15,30);return}
+let lo=Math.min(...prices),hi=Math.max(...prices),span=hi-lo||1;
+ctx.strokeStyle='#38d996';ctx.lineWidth=3;ctx.beginPath();
+prices.forEach((p,i)=>{let x=i*c.width/(prices.length-1),y=c.height-10-(p-lo)/span*(c.height-25);i?ctx.lineTo(x,y):ctx.moveTo(x,y)});
+ctx.stroke();
+}
+async function loadPrice(){
+let coin=document.getElementById('coin').value;
+document.getElementById('price').textContent='Loading...';
+try{
+let r=await fetch('https://api.coingecko.com/api/v3/simple/price?ids='+coin+'&vs_currencies=usd&include_24hr_change=true');
+if(!r.ok)throw Error('Market data unavailable');
+let d=await r.json(),p=d[coin].usd,ch=d[coin].usd_24h_change;
+currentPrice=p;prices.push(p);if(prices.length>30)prices.shift();
+document.getElementById('price').textContent=fmt(p);
+document.getElementById('change').textContent='24-hour change: '+(ch>=0?'+':'')+ch.toFixed(2)+'%';
+document.getElementById('change').className=ch>=0?'green':'red';draw();
+}catch(e){document.getElementById('price').textContent='Price unavailable';document.getElementById('change').textContent='Try again later or check your connection.'}
+}
+function trade(side){
+let n=Number(document.getElementById('amount').value);
+if(!Number.isFinite(n)||n<=0){alert('Enter a valid trade amount.');return}
+if(n>balance){alert('Not enough virtual funds.');return}
+balance-=n;
+let pnl=n*(Math.random()<(reward/(risk+reward))?reward/100:-risk/100);
+balance+=n+pnl;updateBalance();
+let coin=document.getElementById('coin');
+let row=document.createElement('tr');
+[ new Date().toLocaleTimeString(),side,coin.options[coin.selectedIndex].text,fmt(n)+' ('+(pnl>=0?'+':'')+fmt(pnl)+')'].forEach(t=>{let td=document.createElement('td');td.textContent=t;row.appendChild(td)});
+let h=document.getElementById('history');if(h.querySelector('td[colspan]'))h.innerHTML='';
+h.prepend(row);
+}
+document.getElementById('coin').addEventListener('change',()=>{prices=[];loadPrice()});
+loadPrice();setInterval(loadPrice,60000);estimate();
+</script>
+</body>
+</html>
